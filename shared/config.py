@@ -14,7 +14,7 @@ class BankConfig:
 @dataclass
 class SystemConfig:
     # Gemini API
-    GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "AIzaSyA-pTSsrB4tSWCvf7nG_x1N20mL7AzDaFQ")
+    GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
     
     # A2A Configuration
     A2A_DISCOVERY_URL: str = "http://localhost:8000/discovery"
@@ -31,6 +31,12 @@ class SystemConfig:
     
     # Logging
     LOG_LEVEL: str = "INFO"
+
+    # Third Party
+    REGISTRY_PORT:int = 8005
+    CREDIT_BUREAU_PORT:int = 8006
+    ESG_REGUATOR_PORT:int = 8007
+    MARKET_INFO_PORT:int = 8008
     
     def __post_init__(self):
         if self.BANKS is None:
