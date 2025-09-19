@@ -1,0 +1,6 @@
+company_id,is_public,weekly_stock_price_hist,market_cap,pe_ratio
+cmp123,True,125.45,150000000.0,18.2
+cmp456,False,None,None,None
+cmp789,True,210.75,220000000.0,12.5
+cmp101,False,None,None,None
+cmp112,True,89.32,120000000.0,15.8

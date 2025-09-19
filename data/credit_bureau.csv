@@ -1,0 +1,6 @@
+company_id,credit_score,rating,history_summary
+cmp123,780,AAA,"Stable performance with consistent growth"
+cmp456,650,BBB,"Moderate risk, steady but not exceptional"
+cmp789,820,AAA,"Strong financials, industry leader"
+cmp101,520,BB,"Higher risk, some financial instability"
+cmp112,710,AA,"Good standing, minor fluctuations"

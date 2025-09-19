@@ -47,7 +47,8 @@ class MarketData(BaseModel):
     """Company's market info representational schema"""
     company_id: str
     is_public: bool = Field(default=False)
-    curr_stock_price: Optional[float] = None
+    weekly_stock_price_hist: Optional[List[float]] = Field(default = None, 
+                                                           description="Past n week average stock price")
     market_cap: Optional[float] = None
     pe_ratio: Optional[float] = None
 
@@ -147,6 +148,7 @@ class BankRegister(BaseModel):
     bank_name: str
     max_loan_amount: float
     min_interest_rate: float
+    api_url: str = Field(..., description="Agent/API URL of the bank")
 
 class CompanyRegister(BaseModel):
     """Registration Request sent to Registry by Company"""
@@ -154,6 +156,7 @@ class CompanyRegister(BaseModel):
     company_name: str
     annual_revenue: Optional[float] = None
     industry: Optional[str] = None
+    api_url: str = Field(..., description="Agent/API URL of the company")
 
 
 # ========== INQUIRIES ==========

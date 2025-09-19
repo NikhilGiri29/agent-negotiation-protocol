@@ -1,0 +1,6 @@
+bank_id,bank_name,max_loan_amount,min_interest_rate,reputation_score,risk_appetite,esg_data
+B001,Bank A,150000000,1.5,7,moderate,
+B002,Bank B,200000000,2.0,8,conservative,
+B003,Bank C,120000000,1.2,6,aggressive,
+B004,Bank D,180000000,1.8,9,moderate,
+B005,Bank A,100000000,1.0,5,conservative,

@@ -1,0 +1,6 @@
+company_id,company_name,annual_revenue,industry
+cmp123,Company A,15000000.0,Finance
+cmp456,Company B,8500000.0,Consulting
+cmp789,Company C,22000000.0,Investment Banking
+cmp101,Company D,3000000.0,Insurance
+cmp112,Company E,12000000.0,Corporate Finance
