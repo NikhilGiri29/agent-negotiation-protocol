@@ -7,7 +7,7 @@ import json
 import aiohttp
 import asyncio
 from typing import List, Dict, Any
-from shared.schemas import CreditIntent, CreditOffer, OfferEvaluation
+from shared.schema import CreditIntent, CreditOffer, OfferEvaluation
 from shared.config import config
 import logging
 
@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 class CompanyFinanceAgent:
     def __init__(self):
         self.llm = ChatGoogleGenerativeAI(
-            model="gemini-1.5-pro",
+            model="gemini-2.5-flash-lite",
             google_api_key=config.GEMINI_API_KEY,
             temperature=0.3
         )

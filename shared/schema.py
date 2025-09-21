@@ -99,6 +99,62 @@ class CreditIntent(BaseModel):
     task_id: Optional[str] = None
     requesting_agent: Optional[str] = None
 
+
+class ESGScore(BaseModel):
+    """ESG scoring breakdown"""
+    environmental_score: float = Field(..., ge=0, le=10)
+    social_score: float = Field(..., ge=0, le=10)
+    governance_score: float = Field(..., ge=0, le=10)
+    overall_score: float = Field(..., ge=0, le=10)
+    carbon_footprint_category: str = Field(default="medium")
+    sustainability_notes: str = Field(default="")
+
+class CreditOffer(BaseModel):
+    """WFAP Credit Offer - Bank's response"""
+    offer_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    bank_id: str = Field(..., description="Bank identifier")
+    bank_name: str = Field(..., description="Bank display name")
+    intent_id: str = Field(..., description="Original intent ID")
+    
+    # Financial terms
+    approved_amount: float = Field(..., gt=0)
+    interest_rate: float = Field(..., gt=0, description="Annual interest rate %")
+    carbon_adjusted_rate: float = Field(..., gt=0, description="ESG-adjusted rate %")
+    processing_fee: float = Field(default=0, ge=0)
+    collateral_required: bool = Field(default=False)
+    
+    # ESG information
+    esg_score: ESGScore
+    esg_summary: str = Field(..., description="Human-readable ESG impact")
+    
+    # Terms and conditions
+    repayment_schedule: str = Field(default="monthly")
+    early_repayment_penalty: bool = Field(default=False)
+    grace_period_days: int = Field(default=30, ge=0)
+    
+    # Validity and compliance
+    offer_valid_until: datetime
+    regulatory_compliance: Dict[str, Any] = Field(default_factory=dict)
+    risk_assessment: Dict[str, Any] = Field(default_factory=dict)
+    
+    # A2A specific fields
+    task_id: Optional[str] = None
+    responding_agent: Optional[str] = None
+    digital_signature: Optional[str] = None
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
+
+class OfferEvaluation(BaseModel):
+    """Offer evaluation results"""
+    offer_id: str
+    total_score: float = Field(..., ge=0, le=100)
+    financial_score: float = Field(..., ge=0, le=100)
+    esg_score: float = Field(..., ge=0, le=100)
+    terms_score: float = Field(..., ge=0, le=100)
+    recommendation: str = Field(..., description="accept|reject|negotiate")
+    reasoning: str = Field(..., description="Decision explanation")
+
+
+# ========== AUTH & TOKENS ==========
 class AuthToken(BaseModel):
     """Authentication Token given by Registry"""
     token_id: str = Field(default_factory=lambda: str(uuid.uuid4()))

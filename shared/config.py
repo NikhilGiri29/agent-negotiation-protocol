@@ -1,20 +1,21 @@
 import os
-from typing import List, Dict
+from typing import List, Dict, Optional
 from dataclasses import dataclass
 
 @dataclass
 class BankConfig:
     bank_id: str
     bank_name: str
-    base_rate: float
-    esg_multiplier: float
+    max_loan_amount: float
+    min_interest_rate: float
+    reputation_score: int
     risk_appetite: str  # conservative|moderate|aggressive
     port: int
     
 @dataclass
 class SystemConfig:
     # Gemini API
-    GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
+    GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "AIzaSyBLT60I7gLU65NA1uYJJfzrL4S-RYN1dV0")
     
     # A2A Configuration
     A2A_DISCOVERY_URL: str = "http://localhost:8000/discovery"
@@ -23,7 +24,7 @@ class SystemConfig:
     COMPANY_AGENT_PORT: int = 8001
     COMPANY_AGENT_HOST: str = "localhost"
     
-    # Bank Configurations
+    # Bank Configurations (loaded dynamically from CSV)
     BANKS: List[BankConfig] = None
     
     # Streamlit UI
@@ -32,40 +33,15 @@ class SystemConfig:
     # Logging
     LOG_LEVEL: str = "INFO"
 
-    # Third Party
-    REGISTRY_PORT:int = 8005
-    CREDIT_BUREAU_PORT:int = 8006
-    ESG_REGUATOR_PORT:int = 8007
-    MARKET_INFO_PORT:int = 8008
+    # Third Party Services (Fixed ports)
+    REGISTRY_PORT: int = 8005
+    CREDIT_BUREAU_PORT: int = 8006
+    ESG_REGUATOR_PORT: int = 8007
+    MARKET_INFO_PORT: int = 8008
     
-    def __post_init__(self):
-        if self.BANKS is None:
-            self.BANKS = [
-                BankConfig(
-                    bank_id="BANK_A",
-                    bank_name="GreenTech Bank",
-                    base_rate=4.5,
-                    esg_multiplier=0.8,  # Lower rates for good ESG
-                    risk_appetite="conservative",
-                    port=8002
-                ),
-                BankConfig(
-                    bank_id="BANK_B", 
-                    bank_name="EcoFinance Corp",
-                    base_rate=4.2,
-                    esg_multiplier=0.7,
-                    risk_appetite="moderate",
-                    port=8003
-                ),
-                BankConfig(
-                    bank_id="BANK_C",
-                    bank_name="Sustainable Credit Union",
-                    base_rate=4.8,
-                    esg_multiplier=0.9,
-                    risk_appetite="aggressive",
-                    port=8004
-                )
-            ]
+    # Port ranges for dynamic assignment (avoiding third-party ports)
+    BANK_PORT_START: int = 9000
+    COMPANY_PORT_START: int = 4000
 
 # Global configuration instance
 config = SystemConfig()

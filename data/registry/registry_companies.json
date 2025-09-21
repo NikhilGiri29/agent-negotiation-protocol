@@ -1,0 +1,37 @@
+{
+    "cmp123": {
+        "company_id": "cmp123",
+        "company_name": "Company A",
+        "annual_revenue": 15000000.0,
+        "industry": "Finance",
+        "api_url": "http://localhost:4000/a2a"
+    },
+    "cmp456": {
+        "company_id": "cmp456",
+        "company_name": "Company B",
+        "annual_revenue": 8500000.0,
+        "industry": "Consulting",
+        "api_url": "http://localhost:4001/a2a"
+    },
+    "cmp789": {
+        "company_id": "cmp789",
+        "company_name": "Company C",
+        "annual_revenue": 22000000.0,
+        "industry": "Investment Banking",
+        "api_url": "http://localhost:4002/a2a"
+    },
+    "cmp101": {
+        "company_id": "cmp101",
+        "company_name": "Company D",
+        "annual_revenue": 3000000.0,
+        "industry": "Insurance",
+        "api_url": "http://localhost:4003/a2a"
+    },
+    "cmp112": {
+        "company_id": "cmp112",
+        "company_name": "Company E",
+        "annual_revenue": 12000000.0,
+        "industry": "Corporate Finance",
+        "api_url": "http://localhost:4004/a2a"
+    }
+}

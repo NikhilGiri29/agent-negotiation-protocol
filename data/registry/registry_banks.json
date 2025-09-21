@@ -1,0 +1,37 @@
+{
+    "B001": {
+        "bank_id": "B001",
+        "bank_name": "Bank A",
+        "max_loan_amount": 150000000.0,
+        "min_interest_rate": 1.5,
+        "api_url": "http://localhost:9000/a2a"
+    },
+    "B002": {
+        "bank_id": "B002",
+        "bank_name": "Bank B",
+        "max_loan_amount": 200000000.0,
+        "min_interest_rate": 2.0,
+        "api_url": "http://localhost:9001/a2a"
+    },
+    "B003": {
+        "bank_id": "B003",
+        "bank_name": "Bank C",
+        "max_loan_amount": 120000000.0,
+        "min_interest_rate": 1.2,
+        "api_url": "http://localhost:9002/a2a"
+    },
+    "B004": {
+        "bank_id": "B004",
+        "bank_name": "Bank D",
+        "max_loan_amount": 180000000.0,
+        "min_interest_rate": 1.8,
+        "api_url": "http://localhost:9003/a2a"
+    },
+    "B005": {
+        "bank_id": "B005",
+        "bank_name": "Bank E",
+        "max_loan_amount": 100000000.0,
+        "min_interest_rate": 1.0,
+        "api_url": "http://localhost:9004/a2a"
+    }
+}

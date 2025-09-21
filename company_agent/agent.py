@@ -1,214 +1,173 @@
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain.agents import AgentExecutor, create_react_agent
-from langchain.tools import Tool
-from langchain.prompts import PromptTemplate
-from langchain.schema import HumanMessage
-import json
-import aiohttp
+#!/usr/bin/env python3
+"""
+Company Agent - Handles bank discovery and credit intent broadcasting
+"""
 import asyncio
-from typing import List, Dict, Any
-from shared.schemas import CreditIntent, CreditOffer, OfferEvaluation
-from shared.config import config
+import aiohttp
 import logging
+from datetime import datetime
+from typing import List, Dict, Any
+from shared.config import config
+from shared.schema import CreditIntent, CreditOffer
 
+# Setup logging
 logger = logging.getLogger(__name__)
 
-class CompanyFinanceAgent:
+class CompanyAgent:
+    """Company agent for discovering banks and broadcasting credit intents"""
+    
     def __init__(self):
-        self.llm = ChatGoogleGenerativeAI(
-            model="gemini-1.5-pro",
-            google_api_key=config.GEMINI_API_KEY,
-            temperature=0.3
-        )
+        self.discovered_banks: List[Dict] = []
+        self.registry_url = f"http://localhost:{config.REGISTRY_PORT}"
+    
+    async def discover_bank_agents(self) -> Dict[str, Any]:
+        """Discover available bank agents using registry service"""
+        try:
+            async with aiohttp.ClientSession() as session:
+                discovery_request = {
+                    "requesting_agent_id": "company-agent",
+                    "required_role": "bank"
+                }
+                
+                async with session.post(
+                    f"{self.registry_url}/discovery",
+                    json=discovery_request,
+                    timeout=10
+                ) as response:
+                    if response.status == 200:
+                        discovery_data = await response.json()
+                        bank_agents = discovery_data.get("agents", [])
+                        
+                        # Filter for bank agents and extract port information
+                        filtered_banks = []
+                        for agent in bank_agents:
+                            if agent.get("role") == "bank":
+                                # Extract port from agent api_url
+                                api_url = agent.get("api_url", "")
+                                if "localhost:" in api_url:
+                                    port = int(api_url.split("localhost:")[1].split("/")[0])
+                                    # Create base URL without /a2a for WFAP endpoints
+                                    base_url = f"http://localhost:{port}"
+                                    bank_agent = {
+                                        "agent_id": agent.get("agent_id"),
+                                        "name": agent.get("name"),
+                                        "endpoint": base_url,
+                                        "port": port,
+                                        "bank_details": agent.get("bank_details", {})
+                                    }
+                                    filtered_banks.append(bank_agent)
+                        
+                        self.discovered_banks = filtered_banks
+                        logger.info(f"Discovered {len(filtered_banks)} bank agents from registry")
+                        return {
+                            "banks": filtered_banks,
+                            "count": len(filtered_banks),
+                            "timestamp": datetime.now().isoformat(),
+                            "source": "registry"
+                        }
+                    else:
+                        logger.error(f"Registry discovery failed with status {response.status}")
+                        return {
+                            "banks": [],
+                            "count": 0,
+                            "error": "Registry discovery failed",
+                            "timestamp": datetime.now().isoformat()
+                        }
+            
+        except Exception as e:
+            logger.error(f"Error discovering bank agents: {e}")
+            return {
+                "banks": [],
+                "count": 0,
+                "error": str(e),
+                "timestamp": datetime.now().isoformat()
+            }
+    
+    async def broadcast_credit_intent(self, intent: CreditIntent) -> List[CreditOffer]:
+        """Broadcast credit intent to all discovered bank agents"""
+        # First validate the intent through registry
+        validation_result = await self._validate_credit_intent(intent)
+        if not validation_result.get('valid', False):
+            logger.error(f"Credit intent validation failed: {validation_result.get('errors', [])}")
+            raise ValueError(f"Credit intent validation failed: {validation_result.get('message', 'Unknown error')}")
         
-        self.tools = [
-            Tool(
-                name="create_credit_intent",
-                description="Create a structured credit request based on company needs",
-                func=self.create_credit_intent
-            ),
-            Tool(
-                name="evaluate_offers",
-                description="Evaluate and rank multiple bank offers using multi-criteria analysis",
-                func=self.evaluate_offers
-            ),
-            Tool(
-                name="generate_decision_reasoning", 
-                description="Generate human-readable explanation for offer selection",
-                func=self.generate_decision_reasoning
+        if not self.discovered_banks:
+            await self.discover_bank_agents()
+        
+        if not self.discovered_banks:
+            logger.error("No bank agents available for credit intent")
+            return []
+        
+        offers = []
+        tasks = []
+        
+        # Create tasks for all bank agents
+        for bank in self.discovered_banks:
+            task = asyncio.create_task(
+                self._send_credit_intent_to_bank(bank, intent)
             )
-        ]
+            tasks.append(task)
         
-        self.agent_prompt = PromptTemplate.from_template("""
-        You are a sophisticated AI finance agent representing a company seeking credit facilities.
-        Your role is to:
-        1. Create optimal credit requests based on company requirements
-        2. Evaluate bank offers using financial and ESG criteria
-        3. Make data-driven decisions that balance cost, terms, and sustainability
+        # Wait for all tasks to complete
+        results = await asyncio.gather(*tasks, return_exceptions=True)
         
-        Available tools: {tools}
-        Tool names: {tool_names}
+        # Process results
+        for i, result in enumerate(results):
+            if isinstance(result, Exception):
+                logger.error(f"Error with bank {self.discovered_banks[i]['name']}: {result}")
+            elif result:
+                offers.append(result)
         
-        Human: {input}
-        
-        Thought: {agent_scratchpad}
-        """)
-        
-    def create_credit_intent(self, requirements: str) -> str:
-        """Create structured credit intent from natural language requirements"""
-        prompt = f"""
-        Based on these company requirements, create a structured credit intent:
-        {requirements}
-        
-        Consider:
-        - Appropriate credit amount and duration
-        - Business purpose and industry context  
-        - ESG preferences that might reduce borrowing costs
-        - Urgency level based on business needs
-        
-        Return a JSON object with all necessary fields for CreditIntent.
-        """
-        
+        logger.info(f"Received {len(offers)} offers from {len(self.discovered_banks)} banks")
+        return offers
+    
+    async def _validate_credit_intent(self, intent: CreditIntent) -> Dict[str, Any]:
+        """Validate credit intent through registry service"""
         try:
-            response = self.llm.invoke([HumanMessage(content=prompt)])
-            # Parse and validate the response
-            intent_data = json.loads(response.content)
-            intent = CreditIntent(**intent_data)
-            return json.dumps(intent.dict(), default=str)
+            # Convert datetime to ISO string for JSON serialization
+            intent_data = intent.model_dump()
+            intent_data['timestamp'] = intent.timestamp.isoformat()
+            
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    f"{self.registry_url}/validate-credit-intent",
+                    json=intent_data,
+                    timeout=10
+                ) as response:
+                    if response.status == 200:
+                        return await response.json()
+                    else:
+                        logger.error(f"Registry validation failed with status {response.status}")
+                        return {"valid": False, "errors": ["Registry validation failed"]}
         except Exception as e:
-            logger.error(f"Error creating credit intent: {e}")
-            return json.dumps({"error": str(e)})
+            logger.error(f"Error validating credit intent: {e}")
+            return {"valid": False, "errors": [str(e)]}
     
-    def evaluate_offers(self, offers_json: str) -> str:
-        """Evaluate multiple bank offers using multi-criteria analysis"""
+    async def _send_credit_intent_to_bank(self, bank: Dict, intent: CreditIntent) -> CreditOffer:
+        """Send credit intent to a specific bank agent"""
         try:
-            offers_data = json.loads(offers_json)
-            offers = [CreditOffer(**offer) for offer in offers_data]
+            # Convert datetime to ISO string for JSON serialization
+            intent_data = intent.model_dump()
+            intent_data['timestamp'] = intent.timestamp.isoformat()
             
-            evaluations = []
-            for offer in offers:
-                evaluation = self._evaluate_single_offer(offer)
-                evaluations.append(evaluation)
-            
-            # Rank offers by total score
-            evaluations.sort(key=lambda x: x.total_score, reverse=True)
-            
-            return json.dumps([eval.dict() for eval in evaluations], default=str)
-            
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    f"{bank['endpoint']}/wfap/assess-credit",
+                    json=intent_data,
+                    timeout=30
+                ) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        if data.get("status") == "success":
+                            return CreditOffer(**data["offer"])
+                        else:
+                            logger.warning(f"Bank {bank['name']} returned error: {data.get('message')}")
+                    else:
+                        logger.warning(f"Bank {bank['name']} returned status {response.status}")
         except Exception as e:
-            logger.error(f"Error evaluating offers: {e}")
-            return json.dumps({"error": str(e)})
-    
-    def _evaluate_single_offer(self, offer: CreditOffer) -> OfferEvaluation:
-        """Evaluate a single offer using weighted criteria"""
+            logger.error(f"Error communicating with bank {bank['name']}: {e}")
         
-        # Financial criteria (40% weight)
-        financial_score = self._calculate_financial_score(offer)
-        
-        # ESG criteria (35% weight)  
-        esg_score = self._calculate_esg_score(offer)
-        
-        # Terms criteria (25% weight)
-        terms_score = self._calculate_terms_score(offer)
-        
-        # Weighted total score
-        total_score = (
-            financial_score * 0.40 + 
-            esg_score * 0.35 + 
-            terms_score * 0.25
-        )
-        
-        # Generate recommendation
-        recommendation = "accept" if total_score >= 75 else "negotiate" if total_score >= 60 else "reject"
-        
-        # Generate reasoning using LLM
-        reasoning = self._generate_reasoning(offer, financial_score, esg_score, terms_score, total_score)
-        
-        return OfferEvaluation(
-            offer_id=offer.offer_id,
-            total_score=total_score,
-            financial_score=financial_score,
-            esg_score=esg_score,
-            terms_score=terms_score,
-            recommendation=recommendation,
-            reasoning=reasoning
-        )
-    
-    def _calculate_financial_score(self, offer: CreditOffer) -> float:
-        """Calculate financial attractiveness score (0-100)"""
-        # Lower carbon-adjusted rate is better
-        rate_score = max(0, 100 - (offer.carbon_adjusted_rate - 3.0) * 10)
-        
-        # Higher approved amount is better (up to requested amount)
-        amount_score = min(100, (offer.approved_amount / 1000000) * 50)  # Assuming 1M target
-        
-        # Lower fees are better
-        fee_score = max(0, 100 - offer.processing_fee / 1000)
-        
-        return (rate_score * 0.6 + amount_score * 0.3 + fee_score * 0.1)
-    
-    def _calculate_esg_score(self, offer: CreditOffer) -> float:
-        """Calculate ESG alignment score (0-100)"""
-        return offer.esg_score.overall_score * 10  # Convert 0-10 to 0-100
-    
-    def _calculate_terms_score(self, offer: CreditOffer) -> float:
-        """Calculate terms attractiveness score (0-100)"""
-        # No collateral is better
-        collateral_score = 100 if not offer.collateral_required else 50
-        
-        # No early repayment penalty is better
-        penalty_score = 100 if not offer.early_repayment_penalty else 70
-        
-        # Longer grace period is better
-        grace_score = min(100, offer.grace_period_days * 2)
-        
-        return (collateral_score * 0.4 + penalty_score * 0.3 + grace_score * 0.3)
-    
-    def _generate_reasoning(self, offer: CreditOffer, financial_score: float, 
-                          esg_score: float, terms_score: float, total_score: float) -> str:
-        """Generate human-readable reasoning for the evaluation"""
-        
-        prompt = f"""
-        Generate a concise explanation for why this bank offer received a score of {total_score:.1f}/100:
-        
-        Bank: {offer.bank_name}
-        Financial Score: {financial_score:.1f}/100
-        ESG Score: {esg_score:.1f}/100  
-        Terms Score: {terms_score:.1f}/100
-        
-        Key Details:
-        - Interest Rate: {offer.interest_rate}% (Carbon-adjusted: {offer.carbon_adjusted_rate}%)
-        - Approved Amount: ${offer.approved_amount:,.2f}
-        - ESG Overall Score: {offer.esg_score.overall_score}/10
-        - Collateral Required: {offer.collateral_required}
-        - Processing Fee: ${offer.processing_fee:,.2f}
-        
-        Provide a 2-3 sentence explanation focusing on the key strengths and weaknesses.
-        """
-        
-        try:
-            response = self.llm.invoke([HumanMessage(content=prompt)])
-            return response.content.strip()
-        except Exception as e:
-            return f"Standard evaluation based on rate ({offer.carbon_adjusted_rate}%), ESG score ({offer.esg_score.overall_score}/10), and terms."
-    
-    def generate_decision_reasoning(self, evaluation_results: str) -> str:
-        """Generate overall decision reasoning for the best offer"""
-        prompt = f"""
-        Based on these offer evaluations, provide a clear explanation of why the top-ranked offer 
-        was selected and how it aligns with the company's financial and ESG objectives:
-        
-        {evaluation_results}
-        
-        Provide a comprehensive but concise explanation suitable for executive review.
-        """
-        
-        try:
-            response = self.llm.invoke([HumanMessage(content=prompt)])
-            return response.content.strip()
-        except Exception as e:
-            logger.error(f"Error generating decision reasoning: {e}")
-            return "Decision based on optimal balance of financial terms, ESG alignment, and contract flexibility."
+        return None
 
-# Global agent instance
-company_agent = CompanyFinanceAgent()
+# Create global instance
+company_agent = CompanyAgent()
